@@ -1,5 +1,5 @@
-require 'splaytree/version'
-require 'splaytree/node'
+require_relative 'splaytree/version'
+require_relative 'splaytree/node'
 
 class Splaytree
   include Enumerable
@@ -10,6 +10,10 @@ class Splaytree
   def initialize
     @root = nil
     @size = 0
+  end
+
+  def inspect
+    format( "#<Splaytree: tree=%s>", report.inspect )
   end
 
   def empty?
@@ -174,6 +178,30 @@ class Splaytree
     @size = 0
   end
 
+  def bound( low, high )
+    return if empty?
+    floor(high)
+    ceiling(low)
+    stack = []
+    node = @root
+    loop do
+      if node
+        stack.push(node)
+        node.duplicates.each do |value|
+          stack.push(Node.new(node.key, value, node))
+        end
+        left = node.left && node.left.key
+        node = ( left && left >= low ) ? node.left : nil
+      else
+        break if stack.empty?
+        node = stack.pop
+        yield(node.key,node.value)
+        right = node.right && node.right.key
+        node = ( right && right <= high ) ? node.right : nil
+      end
+    end
+  end
+
   def each
     return if empty?
     stack = []
@@ -214,7 +242,7 @@ class Splaytree
     print_tree = -> (node, depth) do
       return unless node
       print_tree.call(node.right, depth + 1)
-      puts node.key.to_s.rjust(5*depth, ' ')
+      printf "%s%s\n", ' '*depth, node.key
       print_tree.call(node.left, depth + 1)
     end
     print_tree.call(@root, 0)
@@ -269,3 +297,4 @@ class Splaytree
       @root = node
     end
 end
+
