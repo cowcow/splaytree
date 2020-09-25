@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require_relative 'splaytree/version'
 require_relative 'splaytree/node'
 
@@ -179,6 +181,7 @@ class Splaytree
   end
 
   def bound( low, high )
+    block_given? or return enum_for(__method__, low, high)
     return if empty?
     floor(high)
     ceiling(low)
@@ -187,31 +190,29 @@ class Splaytree
     loop do
       if node
         stack.push(node)
-        node.duplicates.each do |value|
-          stack.push(Node.new(node.key, value, node))
-        end
         left = node.left && node.left.key
         node = ( left && left >= low ) ? node.left : nil
       else
         break if stack.empty?
         node = stack.pop
+        node.duplicates.each do |value|
+          yield(node.key,value)
+        end
         yield(node.key,node.value)
         right = node.right && node.right.key
         node = ( right && right <= high ) ? node.right : nil
       end
     end
   end
-
-  def each
+  
+  def each_node
+    block_given? or return enum_for(__method__)
     return if empty?
     stack = []
     node = @root
     loop do
       if node
         stack.push(node)
-        node.duplicates.each do |value|
-          stack.push(Node.new(node.key, value, node))
-        end
         node = node.left
       else
         break if stack.empty?
@@ -222,20 +223,32 @@ class Splaytree
     end
   end
 
+  def each
+    block_given? or return enum_for(__method__)
+    each_node{ |node|
+      node.duplicates.each do |value|
+        yield(node.key,value)
+      end
+      yield(node.key,node.value)
+    }
+  end
+
   def each_key
-    each { |node| yield node.key }
+    block_given? or return enum_for(__method__)
+    each { |key,_| yield key }
   end
 
   def each_value
-    each { |node| yield node.value }
+    block_given? or return enum_for(__method__)
+    each { |_,val| yield val }
   end
 
   def keys
-    to_enum(:each_key).to_a
+    each_key.to_a
   end
 
   def values
-    to_enum(:each_value).to_a
+    each_value.to_a
   end
 
   def display
@@ -251,7 +264,14 @@ class Splaytree
   def report
     return if empty?
     result = []
-    each do |node|
+    Enumerator.new do |y|
+      each_node do |node|
+        node.duplicates.each { |value|
+          y << Node.new(node.key, value, node)
+        }
+        y << node
+      end
+    end.each do |node|
       item = {
         node: node.key,
         parent: node.parent && node.parent.key,
@@ -265,36 +285,37 @@ class Splaytree
 
   private
 
-    def get_one_higher_of_root
-      return if @root.right.nil?
-      node = @root.right
-      node = node.left while node.left
-      splay(node)
-      node.to_h
-    end
+  def get_one_higher_of_root
+    return if @root.right.nil?
+    node = @root.right
+    node = node.left while node.left
+    splay(node)
+    node.to_h
+  end
 
-    def get_one_lower_of_root
-      return if @root.left.nil?
-      node = @root.left
-      node = node.right while node.right
-      splay(node)
-      node.to_h
-    end
+  def get_one_lower_of_root
+    return if @root.left.nil?
+    node = @root.left
+    node = node.right while node.right
+    splay(node)
+    node.to_h
+  end
 
-    def splay(node)
-      until node.root?
-        parent = node.parent
-        if parent.root?
-          node.rotate
-        elsif node.zigzig?
-          parent.rotate
-          node.rotate
-        else
-          node.rotate
-          node.rotate
-        end
+  def splay(node)
+    until node.root?
+      parent = node.parent
+      if parent.root?
+        node.rotate
+      elsif node.zigzig?
+        parent.rotate
+        node.rotate
+      else
+        node.rotate
+        node.rotate
       end
-      @root = node
     end
+    @root = node
+  end
 end
+
 
